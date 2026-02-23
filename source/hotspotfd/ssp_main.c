@@ -357,19 +357,45 @@ int main(int argc, char* argv[])
     rdk_logger_init(DEBUG_INI_NAME);
     v_secure_system("touch /tmp/hotspot_initialized");
     hotspot_start();
-    if ( bRunAsDaemon )
-    {
-        while(1)
-        {
+    // Log flooding mechanism for test purposes using rdk-logger
+    if (bRunAsDaemon) {
+        while (1) {
+            int mode = 0;
+            if (access("/tmp/log_flood", F_OK) == 0) {
+                mode = 1;
+            } else if (access("/tmp/log_pattern_flood", F_OK) == 0) {
+                mode = 2;
+            }
+            if (mode == 1) {
+                // Flood same log for 5 sec
+                time_t start = time(NULL);
+                while (difftime(time(NULL), start) < 5.0) {
+                    CcspTraceInfo(("[LOG FLOOD] Test log flooding\n"));
+                    usleep(10000); // 10ms between logs
+                }
+                // Print a different message after flood
+                CcspTraceInfo(("[LOG FLOOD] Flood complete, different message\n"));
+            } else if (mode == 2) {
+                // Flood 4 logs as a pattern for 5 sec
+                const char *pattern[4] = {
+                    "[LOG PATTERN] Log 1\n",
+                    "[LOG PATTERN] Log 2\n",
+                    "[LOG PATTERN] Log 3\n",
+                    "[LOG PATTERN] Log 4\n"
+                };
+                time_t start = time(NULL);
+                int idx = 0;
+                while (difftime(time(NULL), start) < 5.0) {
+                    CcspTraceInfo(("%s", pattern[idx]));
+                    idx = (idx + 1) % 4;
+                    usleep(10000); // 10ms between logs
+                }
+            }
             sleep(30);
         }
-    }
-    else
-    {
-        while ( cmdChar != 'q' )
-        {
+    } else {
+        while (cmdChar != 'q') {
             cmdChar = getchar();
-
             cmd_dispatch(cmdChar);
         }
     }
