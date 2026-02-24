@@ -359,12 +359,16 @@ int main(int argc, char* argv[])
     hotspot_start();
     // Log flooding mechanism for test purposes using rdk-logger
     if (bRunAsDaemon) {
+        CcspTraceInfo(("[DEBUG] Log flooding code changes are present and running.\n"));
         while (1) {
             int mode = 0;
             if (access("/tmp/log_flood", F_OK) == 0) {
                 mode = 1;
             } else if (access("/tmp/log_pattern_flood", F_OK) == 0) {
                 mode = 2;
+            }
+            if (mode != 0) {
+                CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
             }
             if (mode == 1) {
                 // Flood same log for 5 sec
