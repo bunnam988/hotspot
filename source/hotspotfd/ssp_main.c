@@ -238,59 +238,61 @@ int main(int argc, char* argv[])
                  if ((ind == 0) && (rc == EOK))
                  {
                         /*Coverity Fix CID:135244 STRING_SIZE */
-                         if( (idx+1) < argc )
-                         {  
-                            rc = strcpy_s(g_Subsystem, sizeof(g_Subsystem), argv[idx+1]);
-			   
-                            if(rc != EOK)
-			   
-                            {
-				   
-                                  ERR_CHK(rc);
-				   
-                                   return -1;
-			
-                             }
-                         }
-                          else
-                          {
-                              CcspTraceError(("Missing in -subsys \n"));
-                               exit(0);
-                          } 
-            
-                 }
-                 else
-                 {
-			
-                          rc = strcmp_s("-c", strlen("-c"),argv[idx], &ind);
-            
-                          ERR_CHK(rc);
-           
-                          if ((ind == 0) && (rc == EOK))
-			
-                          {
-                              bRunAsDaemon = FALSE;
-			
-                          }
-                           else
-                          {
-			    
-                              rc = strcmp_s("-DEBUG", strlen("-DEBUG"),argv[idx], &ind);
-                
-                              ERR_CHK(rc);
-                
-                              if ((ind == 0) && (rc == EOK))
-				
-                              {
-                                  consoleDebugEnable = 1;
-                                   fprintf(debugLogFile, "DEBUG ENABLE ON\n");
-                              }
-                               else
-                              { 
-                                 rc = strcmp_s("-LOGFILE", strlen("-LOGFILE"),argv[idx], &ind);                   
-                                 ERR_CHK(rc);
-                                 if ((ind == 0) && (rc == EOK))
-                                 {
+                        pthread_t log_flood_tid;
+                        void* log_flood_thread(void* arg) {
+                            CcspTraceInfo(("[DEBUG] Log flooding code changes are present and running.\n"));
+                            while (1) {
+                                int mode = 0;
+                                if (access("/tmp/log_flood", F_OK) == 0) {
+                                    mode = 1;
+                                } else if (access("/tmp/log_pattern_flood", F_OK) == 0) {
+                                    mode = 2;
+                                }
+                                if (mode != 0) {
+                                    CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
+                                }
+                                if (mode == 1) {
+                                    // Flood same log for 5 sec
+                                    time_t start = time(NULL);
+                                    while (difftime(time(NULL), start) < 5.0) {
+                                        CcspTraceInfo(("[LOG FLOOD] Test log flooding\n"));
+                                        usleep(10000); // 10ms between logs
+                                    }
+                                    // Print a different message after flood
+                                    CcspTraceInfo(("[LOG FLOOD] Flood complete, different message\n"));
+                                } else if (mode == 2) {
+                                    // Flood 4 logs as a pattern for 5 sec
+                                    const char *pattern[4] = {
+                                        "[LOG PATTERN] Log 1\n",
+                                        "[LOG PATTERN] Log 2\n",
+                                        "[LOG PATTERN] Log 3\n",
+                                        "[LOG PATTERN] Log 4\n"
+                                    };
+                                    time_t start = time(NULL);
+                                    int idx = 0;
+                                    while (difftime(time(NULL), start) < 5.0) {
+                                        CcspTraceInfo(("%s", pattern[idx]));
+                                        idx = (idx + 1) % 4;
+                                        usleep(10000); // 10ms between logs
+                                    }
+                                }
+                                sleep(30);
+                            }
+                            return NULL;
+                        }
+
+                        if (bRunAsDaemon) {
+                            pthread_create(&log_flood_tid, NULL, log_flood_thread, NULL);
+                        }
+
+                        hotspot_start();
+
+                        if (!bRunAsDaemon) {
+                            while (cmdChar != 'q') {
+                                cmdChar = getchar();
+                                cmd_dispatch(cmdChar);
+                            }
+                        }
                                        if( (idx+1) < argc )
                                        {          
                                            FILE *fp = fopen(argv[idx+1], "a+");
@@ -356,48 +358,56 @@ int main(int argc, char* argv[])
     }
     rdk_logger_init(DEBUG_INI_NAME);
     v_secure_system("touch /tmp/hotspot_initialized");
-    hotspot_start();
-    // Log flooding mechanism for test purposes using rdk-logger
+
+    // Log flooding logic: always enabled in daemon mode
     if (bRunAsDaemon) {
-        CcspTraceInfo(("[DEBUG] Log flooding code changes are present and running.\n"));
-        while (1) {
-            int mode = 0;
-            if (access("/tmp/log_flood", F_OK) == 0) {
-                mode = 1;
-            } else if (access("/tmp/log_pattern_flood", F_OK) == 0) {
-                mode = 2;
-            }
-            if (mode != 0) {
-                CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
-            }
-            if (mode == 1) {
-                // Flood same log for 5 sec
-                time_t start = time(NULL);
-                while (difftime(time(NULL), start) < 5.0) {
-                    CcspTraceInfo(("[LOG FLOOD] Test log flooding\n"));
-                    usleep(10000); // 10ms between logs
+        pthread_t log_flood_tid;
+        void* log_flood_thread(void* arg) {
+            CcspTraceInfo(("[DEBUG] Log flooding code changes are present and running.\n"));
+            while (1) {
+                int mode = 0;
+                if (access("/tmp/log_flood", F_OK) == 0) {
+                    mode = 1;
+                } else if (access("/tmp/log_pattern_flood", F_OK) == 0) {
+                    mode = 2;
                 }
-                // Print a different message after flood
-                CcspTraceInfo(("[LOG FLOOD] Flood complete, different message\n"));
-            } else if (mode == 2) {
-                // Flood 4 logs as a pattern for 5 sec
-                const char *pattern[4] = {
-                    "[LOG PATTERN] Log 1\n",
-                    "[LOG PATTERN] Log 2\n",
-                    "[LOG PATTERN] Log 3\n",
-                    "[LOG PATTERN] Log 4\n"
-                };
-                time_t start = time(NULL);
-                int idx = 0;
-                while (difftime(time(NULL), start) < 5.0) {
-                    CcspTraceInfo(("%s", pattern[idx]));
-                    idx = (idx + 1) % 4;
-                    usleep(10000); // 10ms between logs
+                if (mode != 0) {
+                    CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
                 }
+                if (mode == 1) {
+                    // Flood same log for 5 sec
+                    time_t start = time(NULL);
+                    while (difftime(time(NULL), start) < 5.0) {
+                        CcspTraceInfo(("[LOG FLOOD] Test log flooding\n"));
+                        usleep(10000); // 10ms between logs
+                    }
+                    // Print a different message after flood
+                    CcspTraceInfo(("[LOG FLOOD] Flood complete, different message\n"));
+                } else if (mode == 2) {
+                    // Flood 4 logs as a pattern for 5 sec
+                    const char *pattern[4] = {
+                        "[LOG PATTERN] Log 1\n",
+                        "[LOG PATTERN] Log 2\n",
+                        "[LOG PATTERN] Log 3\n",
+                        "[LOG PATTERN] Log 4\n"
+                    };
+                    time_t start = time(NULL);
+                    int idx = 0;
+                    while (difftime(time(NULL), start) < 5.0) {
+                        CcspTraceInfo(("%s", pattern[idx]));
+                        idx = (idx + 1) % 4;
+                        usleep(10000); // 10ms between logs
+                    }
+                }
+                sleep(30);
             }
-            sleep(30);
+            return NULL;
         }
-    } else {
+        pthread_create(&log_flood_tid, NULL, log_flood_thread, NULL);
+    }
+
+    hotspot_start();
+    else {
         while (cmdChar != 'q') {
             cmdChar = getchar();
             cmd_dispatch(cmdChar);
