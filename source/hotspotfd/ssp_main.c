@@ -215,9 +215,13 @@ static void* log_flood_thread(void* arg) {
     while (1) {
         int mode = 0;
         if (access("/tmp/log_flood", F_OK) == 0) {
-            mode = 1;
-        } else if (access("/tmp/log_pattern_flood", F_OK) == 0) {
-            mode = 2;
+            mode = 1;  // Single log flooding
+        } else if (access("/tmp/log_pattern_2", F_OK) == 0) {
+            mode = 2;  // 2 unique logs pattern
+        } else if (access("/tmp/log_pattern_3", F_OK) == 0) {
+            mode = 3;  // 3 unique logs pattern
+        } else if (access("/tmp/log_pattern_4", F_OK) == 0) {
+            mode = 4;  // 4 unique logs pattern
         }
         if (mode != 0) {
             CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
@@ -232,12 +236,39 @@ static void* log_flood_thread(void* arg) {
             // Print a different message after flood
             CcspTraceInfo(("[LOG FLOOD] Flood complete, different message\n"));
         } else if (mode == 2) {
+            // Flood 2 logs as a pattern for 5 sec
+            const char *pattern[2] = {
+                "[LOG PATTERN 2] Log 1\n",
+                "[LOG PATTERN 2] Log 2\n"
+            };
+            time_t start = time(NULL);
+            int pattern_idx = 0;
+            while (difftime(time(NULL), start) < 5.0) {
+                CcspTraceInfo(("%s", pattern[pattern_idx]));
+                pattern_idx = (pattern_idx + 1) % 2;
+                usleep(10000); // 10ms between logs
+            }
+        } else if (mode == 3) {
+            // Flood 3 logs as a pattern for 5 sec
+            const char *pattern[3] = {
+                "[LOG PATTERN 3] Log 1\n",
+                "[LOG PATTERN 3] Log 2\n",
+                "[LOG PATTERN 3] Log 3\n"
+            };
+            time_t start = time(NULL);
+            int pattern_idx = 0;
+            while (difftime(time(NULL), start) < 5.0) {
+                CcspTraceInfo(("%s", pattern[pattern_idx]));
+                pattern_idx = (pattern_idx + 1) % 3;
+                usleep(10000); // 10ms between logs
+            }
+        } else if (mode == 4) {
             // Flood 4 logs as a pattern for 5 sec
             const char *pattern[4] = {
-                "[LOG PATTERN] Log 1\n",
-                "[LOG PATTERN] Log 2\n",
-                "[LOG PATTERN] Log 3\n",
-                "[LOG PATTERN] Log 4\n"
+                "[LOG PATTERN 4] Log 1\n",
+                "[LOG PATTERN 4] Log 2\n",
+                "[LOG PATTERN 4] Log 3\n",
+                "[LOG PATTERN 4] Log 4\n"
             };
             time_t start = time(NULL);
             int pattern_idx = 0;
