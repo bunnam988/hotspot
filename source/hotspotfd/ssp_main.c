@@ -249,7 +249,7 @@ static void* log_flood_thread(void* arg) {
             CcspTraceInfo(("[LOG FLOOD] Flood complete, different message\n"));
         } else if (mode >= 2 && mode <= 10) {
             // Flood N logs as a pattern for 5 sec
-            const char *patterns[10][10] = {
+            const char *patterns[11][10] = {
                 {},  // mode 0 - unused
                 {},  // mode 1 - handled separately
                 {"[LOG PATTERN 2] Log 1\n", "[LOG PATTERN 2] Log 2\n"},
