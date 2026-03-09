@@ -269,6 +269,8 @@ static void* log_flood_thread(void* arg) {
                 pattern_idx = (pattern_idx + 1) % mode;
                 usleep(10000); // 10ms between logs
             }
+            // Print a different message after pattern flood to break the pattern
+            CcspTraceInfo(("[LOG PATTERN %d] Flood complete, pattern broken for summary\n", mode));
         }
         sleep(30);
     }
