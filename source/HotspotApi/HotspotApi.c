@@ -21,7 +21,12 @@
 #include "libHotspot.h"
 #include "libHotspotApi.h"
 #include "webconfig_framework.h"
+#ifdef PSM_SERVERLESS
+#include "psm_api.h"
+#include <stdlib.h>   /* free() */
+#else
 #include "ccsp_psm_helper.h"
+#endif
 #include "ansc_platform.h"
 #include "safec_lib_common.h"
 
@@ -939,6 +944,17 @@ PsmGet(const char *param, char *value, int size)
 {
     char *val = NULL;
 
+#ifdef PSM_SERVERLESS
+    if (PSM_Get_Record_Value2(NULL, NULL,
+                (char *)param, NULL, &val) != 0)
+        return -1;
+
+    if (val) {
+        snprintf(value, size, "%s", val);
+        free(val);
+    }
+    else return -1;
+#else
     if (PSM_Get_Record_Value2(bus_handle, g_Subsystem,
                 (char *)param, NULL, &val) != CCSP_SUCCESS)
         return -1;
@@ -948,6 +964,7 @@ PsmGet(const char *param, char *value, int size)
         ((CCSP_MESSAGE_BUS_INFO *)bus_handle)->freefunc(val);
     }
     else return -1;
+#endif
 
     return 0;
 }
@@ -955,8 +972,13 @@ PsmGet(const char *param, char *value, int size)
 int 
 PsmSet(const char *param, const char *value)
 {
+#ifdef PSM_SERVERLESS
+    if (PSM_Set_Record_Value2(NULL, NULL,
+                (char *)param, PSM_PARAM_TYPE_STRING, (char *)value) != 0) {
+#else
     if (PSM_Set_Record_Value2(bus_handle, g_Subsystem,
-                (char *)param, ccsp_string, (char *)value) != CCSP_SUCCESS){
+                (char *)param, ccsp_string, (char *)value) != CCSP_SUCCESS) {
+#endif
         CcspTraceError(("HOTSPOT_LIB : PSM set is unsuccessful \n"));
         return -1;
     }

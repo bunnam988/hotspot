@@ -23,10 +23,17 @@ AM_CFLAGS += -I$(top_srcdir)/source/include
 AM_CFLAGS += -I$(top_srcdir)/source/util
 AM_CFLAGS += -DWBCFG_MULTI_COMP_SUPPORT
 
+if PSM_SERVERLESS
+AM_CFLAGS += -DPSM_SERVERLESS $(PSM_CFLAGS)
+endif
+
 AM_LDFLAGS = -lpthread -lz -lsysevent -lsyscfg -lulog -llmapi -lnetfilter_queue -lnfnetlink -lccsp_common -ltelemetry_msgsender -ljansson
 
 libHotspotApi_la_SOURCES = libHotspot.h libHotspotApi.h HotspotApi.c HotspotLib.c HotspotJansson.c
 libHotspotApi_la_LDFLAGS = -ljansson -lsyscfg
+if PSM_SERVERLESS
+libHotspotApi_la_LDFLAGS += $(PSM_LIBS)
+endif
 if CORE_NET_LIB_FEATURE_SUPPORT
 libHotspotApi_la_LDFLAGS += -lnet
 endif

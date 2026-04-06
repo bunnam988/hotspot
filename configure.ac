@@ -70,6 +70,30 @@ AC_ARG_ENABLE([core_net_lib_feature_support],
 esac],[core_net_lib_feature_support=false])
 AM_CONDITIONAL(CORE_NET_LIB_FEATURE_SUPPORT, test x"$core_net_lib_feature_support" = x"true")
 
+# --enable-serverless: use in-process PSM SQLite library instead of PSM daemon
+PSM_SERVERLESS_ENABLED=false
+PSM_CFLAGS=""
+PSM_LIBS="-lpsm"
+AC_ARG_ENABLE([serverless],
+    AS_HELP_STRING([--enable-serverless],
+        [Use in-process PSM SQLite library instead of the PSM daemon (default: no)]),
+    [case "${enableval}" in
+        yes) PSM_SERVERLESS_ENABLED=true ;;
+        no)  PSM_SERVERLESS_ENABLED=false ;;
+        *)   AC_MSG_ERROR([bad value ${enableval} for --enable-serverless]) ;;
+    esac],
+    [echo "serverless PSM build is disabled"])
+AM_CONDITIONAL([PSM_SERVERLESS], [test x$PSM_SERVERLESS_ENABLED = xtrue])
+
+AC_ARG_WITH([psm-include],
+    AS_HELP_STRING([--with-psm-include=DIR],
+        [directory containing psm_api.h (default: system include path)]),
+    [PSM_CFLAGS="-I${withval}"],
+    [PSM_CFLAGS=""])
+
+AC_SUBST([PSM_CFLAGS])
+AC_SUBST([PSM_LIBS])
+
 AC_PREFIX_DEFAULT(`pwd`)
 AC_ENABLE_SHARED
 AC_DISABLE_STATIC

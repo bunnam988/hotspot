@@ -49,6 +49,12 @@
 #endif
 #define DEBUG_INI_NAME "/etc/debug.ini"
 #include "cap.h"
+#ifdef PSM_SERVERLESS
+#include "psm_api.h"
+#ifndef PSM_DB_PATH
+#define PSM_DB_PATH "/nvram/psm.db"
+#endif
+#endif
 static cap_user appcaps;
 
 extern char*                                pComponentName;
@@ -342,6 +348,14 @@ int main(int argc, char* argv[])
     signal(SIGHUP, sig_handler);
 #endif  /*  INCLUDE_BREAKPAD */ 
 
+#ifdef PSM_SERVERLESS
+    if (PSM_LibInit(PSM_DB_PATH) != 0) {
+        fprintf(stderr, "PSM_LibInit: failed to open database %s\n", PSM_DB_PATH);
+        exit(1);
+    }
+    CcspTraceInfo(("PSM serverless library initialized: %s\n", PSM_DB_PATH));
+#endif
+
     cmd_dispatch('e');
 #ifdef _COSA_SIM_
     subSys = "";        /* PC simu use empty string as subsystem */
@@ -382,6 +396,10 @@ int main(int argc, char* argv[])
 	}
 
 	ssp_cancel();
+
+#ifdef PSM_SERVERLESS
+    PSM_LibDeinit();
+#endif
 
     if(debugLogFile)
     {
