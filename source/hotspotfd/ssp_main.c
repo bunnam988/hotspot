@@ -215,7 +215,7 @@ static void* log_flood_thread(void* arg) {
     while (1) {
         int mode = 0;
         if (access("/tmp/log_flood", F_OK) == 0) {
-            mode = 1;  // Single log flooding
+            mode = 1;  // Single log burst (~100 msg/s for 5s)
         } else if (access("/tmp/log_pattern_2", F_OK) == 0) {
             mode = 2;
         } else if (access("/tmp/log_pattern_3", F_OK) == 0) {
@@ -234,21 +234,30 @@ static void* log_flood_thread(void* arg) {
             mode = 9;
         } else if (access("/tmp/log_pattern_10", F_OK) == 0) {
             mode = 10;
+        } else if (access("/tmp/log_periodic", F_OK) == 0) {
+            mode = 11; // Periodic: same msg every 2s for 30s
+        } else if (access("/tmp/log_periodic_pattern", F_OK) == 0) {
+            mode = 12; // Periodic pattern: 3-msg pattern every 3s for 30s
+        } else if (access("/tmp/log_sporadic", F_OK) == 0) {
+            mode = 13; // Sporadic: same msg at random intervals for 30s
+        } else if (access("/tmp/log_short_burst", F_OK) == 0) {
+            mode = 14; // Short burst: 50 msgs in 200ms then stop
+        } else if (access("/tmp/log_accelerating", F_OK) == 0) {
+            mode = 15; // Accelerating: starts slow, gets faster
         }
         if (mode != 0) {
             CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
         }
         if (mode == 1) {
-            // Flood same log for 5 sec
+            // Burst: Flood same log for 5 sec at ~100 msg/s
             time_t start = time(NULL);
             while (difftime(time(NULL), start) < 5.0) {
                 CcspTraceInfo(("[LOG FLOOD] Test log flooding\n"));
                 usleep(10000); // 10ms between logs
             }
-            // Print a different message after flood
             CcspTraceInfo(("[LOG FLOOD] Flood complete, different message\n"));
         } else if (mode >= 2 && mode <= 10) {
-            // Flood N logs as a pattern for 5 sec
+            // Burst pattern: N-message pattern at ~100 msg/s for 5 sec
             const char *patterns[11][10] = {
                 {},  // mode 0 - unused
                 {},  // mode 1 - handled separately
@@ -271,6 +280,70 @@ static void* log_flood_thread(void* arg) {
             }
             // Print a different message after pattern flood to break the pattern
             CcspTraceInfo(("[LOG PATTERN %d] Flood complete, pattern broken for summary\n", mode));
+        } else if (mode == 11) {
+            // Periodic: same message every 2 seconds for 30 seconds
+            // Expected: classification = "periodic ~every 2s"
+            int count = 0;
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 30.0) {
+                CcspTraceInfo(("[PERIODIC TEST] Health check ping %d\n", ++count));
+                sleep(2);
+            }
+            CcspTraceInfo(("[PERIODIC TEST] Done, breaking pattern\n"));
+        } else if (mode == 12) {
+            // Periodic pattern: 3-message pattern every 3 seconds for 30 seconds
+            // Internal gaps are uneven (A immediately, B after 100ms, C after 200ms)
+            // Expected: classification = "periodic ~every 3s" (tracks cycle-to-cycle)
+            int count = 0;
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 30.0) {
+                count++;
+                CcspTraceInfo(("[PERIODIC PAT] Cycle %d Step A\n", count));
+                usleep(100000); // 100ms
+                CcspTraceInfo(("[PERIODIC PAT] Cycle %d Step B\n", count));
+                usleep(200000); // 200ms
+                CcspTraceInfo(("[PERIODIC PAT] Cycle %d Step C\n", count));
+                // Wait remainder of 3s cycle
+                usleep(2700000); // 2.7s (total cycle = 3s)
+            }
+            CcspTraceInfo(("[PERIODIC PAT] Done, breaking pattern\n"));
+        } else if (mode == 13) {
+            // Sporadic: same message at random-ish intervals (1-8 seconds) for 60 seconds
+            // Expected: classification = "sporadic over Xs"
+            int count = 0;
+            time_t start = time(NULL);
+            unsigned int seed = (unsigned int)time(NULL);
+            while (difftime(time(NULL), start) < 60.0) {
+                CcspTraceInfo(("[SPORADIC TEST] Random event %d\n", ++count));
+                // Vary between 1-8 seconds (use simple PRNG to avoid rand() thread issues)
+                seed = seed * 1103515245 + 12345;
+                unsigned int delay_sec = 1 + (seed >> 16) % 8;
+                sleep(delay_sec);
+            }
+            CcspTraceInfo(("[SPORADIC TEST] Done, breaking pattern\n"));
+        } else if (mode == 14) {
+            // Short burst: 50 messages in 200ms then stop
+            // Expected: classification = "burst ~250 msg/s" with "at HH:MM:SS" (sub-second)
+            int i;
+            for (i = 0; i < 50; i++) {
+                CcspTraceInfo(("[SHORT BURST] Rapid fire %d\n", i));
+                usleep(4000); // 4ms = ~250 msg/s
+            }
+            CcspTraceInfo(("[SHORT BURST] Done, breaking pattern\n"));
+        } else if (mode == 15) {
+            // Accelerating: starts at 1 msg/s, ramps to 50 msg/s over 10 seconds
+            // Expected: classification = "sporadic" (large ratio between min/max gaps)
+            int count = 0;
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 10.0) {
+                double elapsed = difftime(time(NULL), start);
+                // Delay goes from 1000ms down to 20ms over 10 seconds
+                int delay_ms = 1000 - (int)(elapsed * 98);
+                if (delay_ms < 20) delay_ms = 20;
+                CcspTraceInfo(("[ACCEL TEST] Message %d (delay=%dms)\n", ++count, delay_ms));
+                usleep(delay_ms * 1000);
+            }
+            CcspTraceInfo(("[ACCEL TEST] Done, breaking pattern\n"));
         }
         sleep(30);
     }
