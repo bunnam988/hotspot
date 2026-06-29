@@ -244,6 +244,16 @@ static void* log_flood_thread(void* arg) {
             mode = 14; // Short burst: 50 msgs in 200ms then stop
         } else if (access("/tmp/log_accelerating", F_OK) == 0) {
             mode = 15; // Accelerating: starts slow, gets faster
+        } else if (access("/tmp/log_sporadic_pattern", F_OK) == 0) {
+            mode = 16; // Sporadic pattern: 2-msg pattern at random intervals
+        } else if (access("/tmp/log_periodic_pattern_sec", F_OK) == 0) {
+            mode = 17; // Periodic pattern with seconds-level internal gaps
+        } else if (access("/tmp/log_periodic_pattern_varied", F_OK) == 0) {
+            mode = 18; // Periodic pattern with varied (non-uniform) internal gaps
+        } else if (access("/tmp/log_burst_pattern_varied", F_OK) == 0) {
+            mode = 19; // Burst pattern with non-uniform internal timing
+        } else if (access("/tmp/log_sporadic_single_long", F_OK) == 0) {
+            mode = 20; // Sporadic single with long gaps (10-30s)
         }
         if (mode != 0) {
             CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
@@ -339,6 +349,80 @@ static void* log_flood_thread(void* arg) {
                 usleep(delay_ms * 1000);
             }
             CcspTraceInfo(("[ACCEL TEST] Done, breaking pattern\n"));
+        } else if (mode == 16) {
+            // Sporadic pattern: 2-message pattern at random intervals (3-10s between cycles)
+            // Internal: msg1 immediately, msg2 after 2 seconds
+            // Expected: "sporadic over Xs" classification with At: line for cycle starts
+            time_t start = time(NULL);
+            unsigned int seed = (unsigned int)time(NULL) ^ 0xDEAD;
+            while (difftime(time(NULL), start) < 60.0) {
+                CcspTraceInfo(("[SPORADIC PAT] Connect attempt to server\n"));
+                sleep(2); // 2s gap within pattern
+                CcspTraceInfo(("[SPORADIC PAT] Connect result: OK\n"));
+                // Random 3-10s gap between cycles
+                seed = seed * 1103515245 + 12345;
+                unsigned int delay_sec = 3 + (seed >> 16) % 8;
+                sleep(delay_sec);
+            }
+            CcspTraceInfo(("[SPORADIC PAT] Done, breaking pattern\n"));
+        } else if (mode == 17) {
+            // Periodic pattern with seconds-level internal gaps (not ms)
+            // 3-message pattern: A, then 1s later B, then 2.5s later C
+            // Cycle repeats every 6s (total internal = 3.5s, wait 2.5s)
+            // Expected: "periodic ~every 6s", intra_offsets = [0, 1.0, 3.5]
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 42.0) {
+                CcspTraceInfo(("[PERIODIC SEC] Phase 1: init check\n"));
+                sleep(1); // 1s gap A->B
+                CcspTraceInfo(("[PERIODIC SEC] Phase 2: connect verify\n"));
+                usleep(2500000); // 2.5s gap B->C
+                CcspTraceInfo(("[PERIODIC SEC] Phase 3: status report\n"));
+                usleep(2500000); // 2.5s wait to complete 6s cycle
+            }
+            CcspTraceInfo(("[PERIODIC SEC] Done, breaking pattern\n"));
+        } else if (mode == 18) {
+            // Periodic pattern with varied (non-uniform) internal gaps
+            // 4-message pattern: A +500ms-> B +2s-> C +300ms-> D
+            // Cycle repeats every 5s (internal = 2.8s, wait 2.2s)
+            // Tests expand_suppressed_logs learns different offsets correctly
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 35.0) {
+                CcspTraceInfo(("[PERIODIC VAR] Step A: scan start\n"));
+                usleep(500000); // 500ms A->B
+                CcspTraceInfo(("[PERIODIC VAR] Step B: scan complete\n"));
+                sleep(2); // 2s B->C
+                CcspTraceInfo(("[PERIODIC VAR] Step C: process results\n"));
+                usleep(300000); // 300ms C->D
+                CcspTraceInfo(("[PERIODIC VAR] Step D: report done\n"));
+                usleep(2200000); // 2.2s wait to complete 5s cycle
+            }
+            CcspTraceInfo(("[PERIODIC VAR] Done, breaking pattern\n"));
+        } else if (mode == 19) {
+            // Burst pattern with non-uniform internal timing
+            // 3-message pattern burst: A +4ms-> B +12ms-> C, repeat at ~62 msg/s
+            // Tests that burst multi-msg expansion doesn't assume uniform spacing
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 3.0) {
+                CcspTraceInfo(("[BURST VAR] Req send\n"));
+                usleep(4000); // 4ms A->B
+                CcspTraceInfo(("[BURST VAR] Req ack\n"));
+                usleep(12000); // 12ms B->C
+                CcspTraceInfo(("[BURST VAR] Req complete\n"));
+                // No extra wait — immediately repeat (effective ~62 cycles/s)
+            }
+            CcspTraceInfo(("[BURST VAR] Done, breaking pattern\n"));
+        } else if (mode == 20) {
+            // Sporadic single with long gaps (10-30s) for 3 minutes
+            // Expected: "sporadic over Xmin" with fewer At: timestamps
+            time_t start = time(NULL);
+            unsigned int seed = (unsigned int)time(NULL) ^ 0xBEEF;
+            while (difftime(time(NULL), start) < 180.0) {
+                CcspTraceInfo(("[SPORADIC LONG] Rare condition detected\n"));
+                seed = seed * 1103515245 + 12345;
+                unsigned int delay_sec = 10 + (seed >> 16) % 21; // 10-30s
+                sleep(delay_sec);
+            }
+            CcspTraceInfo(("[SPORADIC LONG] Done, breaking pattern\n"));
         }
         sleep(30);
     }
