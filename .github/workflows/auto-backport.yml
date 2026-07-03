@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [labeled, closed]
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   cherry-pick:
     if: github.event.pull_request.merged == true && contains(toJSON(github.event.pull_request.labels.*.name), 'cherry-pick to ')
