@@ -1,1 +1,2 @@
 # Hotspot gatekeeper test
+# This line will conflict with stable2
