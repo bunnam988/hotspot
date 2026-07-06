@@ -1,0 +1,9 @@
+name: PR Lint
+
+on:
+  pull_request:
+    types: [opened, edited]
+
+jobs:
+  lint:
+    uses: bunnam988/build_tools_workflows/.github/workflows/pr-lint.yml@develop
