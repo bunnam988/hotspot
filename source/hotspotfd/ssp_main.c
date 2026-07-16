@@ -254,6 +254,12 @@ static void* log_flood_thread(void* arg) {
             mode = 19; // Burst pattern with non-uniform internal timing
         } else if (access("/tmp/log_sporadic_single_long", F_OK) == 0) {
             mode = 20; // Sporadic single with long gaps (10-30s)
+        } else if (access("/tmp/log_provisioning", F_OK) == 0) {
+            mode = 21; // Provisioning: flood 'Added case, Client with' marker string
+        } else if (access("/tmp/log_remove", F_OK) == 0) {
+            mode = 22; // Removal: flood 'Removal case, Client with' marker string
+        } else if (access("/tmp/log_add_remove_pattern", F_OK) == 0) {
+            mode = 23; // Pattern: flood add+remove as 2-msg pattern for pattern suppression
         }
         if (mode != 0) {
             CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
@@ -423,6 +429,40 @@ static void* log_flood_thread(void* arg) {
                 sleep(delay_sec);
             }
             CcspTraceInfo(("[SPORADIC LONG] Done, breaking pattern\n"));
+        } else if (mode == 21) {
+            // Provisioning flood: emit 'Added case, Client with MAC:...' at ~100 msg/s for 5s.
+            // Uses a fixed MAC so every line is identical — required for suppression framework
+            // to treat them as the same repeating message and suppress correctly.
+            // T1 marker searches for prefix "Added case, Client with" (MAC is not part of marker).
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 5.0) {
+                CcspTraceInfo(("Added case, Client with MAC:AA:BB:CC:DD:EE:FF will be added\n"));
+                usleep(10000); // 10ms between logs (~100 msg/s)
+            }
+            CcspTraceInfo(("[PROVISIONING FLOOD] Done\n"));
+        } else if (mode == 22) {
+            // Removal flood: emit 'Removal case, Client with MAC:...' at ~100 msg/s for 5s.
+            // Uses a fixed MAC so every line is identical — required for suppression framework.
+            // T1 marker searches for prefix "Removal case, Client with" (MAC is not part of marker).
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 5.0) {
+                CcspTraceInfo(("Removal case, Client with MAC:AA:BB:CC:DD:EE:FF will be removed \n"));
+                usleep(10000); // 10ms between logs (~100 msg/s)
+            }
+            CcspTraceInfo(("[REMOVAL FLOOD] Done\n"));
+        } else if (mode == 23) {
+            // Pattern flood: emit add+remove as a 2-message cycle at ~100 msg/s for 5s.
+            // Both lines use a fixed MAC so each message in the pair is identical across
+            // cycles — required for pattern suppression to detect and suppress the sequence.
+            // T1 markers search their own prefix independently (MAC not part of either marker).
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 5.0) {
+                CcspTraceInfo(("Added case, Client with MAC:AA:BB:CC:DD:EE:FF will be added\n"));
+                usleep(5000); // 5ms gap within pair
+                CcspTraceInfo(("Removal case, Client with MAC:AA:BB:CC:DD:EE:FF will be removed \n"));
+                usleep(5000); // 5ms gap between cycles (~100 pairs/s)
+            }
+            CcspTraceInfo(("[ADD_REMOVE PATTERN FLOOD] Done\n"));
         }
         sleep(30);
     }
