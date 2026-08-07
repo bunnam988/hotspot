@@ -7,7 +7,7 @@ on:
 jobs:
   cherry-pick:
     if: github.event.pull_request.merged == true && contains(toJSON(github.event.pull_request.labels.*.name), 'cherry-pick to ')
-    uses: bunnam988/build_tools_workflows/.github/workflows/cherry-pick.yml@develop
+    uses: bunnam988/build_tools_workflows/.github/workflows/cherry-pick.yml@feature/auto-cherry-pick-gatekeeper
     with:
       raw_labels: ${{ toJSON(github.event.pull_request.labels) }}
       trigger_label: ${{ github.event.label.name }}
