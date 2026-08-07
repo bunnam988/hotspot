@@ -12,4 +12,12 @@ on:
 
 jobs:
   run-shared-gatekeeper:
-    uses: bunnam988/build_tools_workflows/.github/workflows/gatekeeper.yml@develop
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'pull_request_review' &&
+       (github.event.pull_request.base.ref == 'develop' ||
+        startsWith(github.event.pull_request.base.ref, 'release/') ||
+        startsWith(github.event.pull_request.base.ref, 'support/')))
+    uses: bunnam988/build_tools_workflows/.github/workflows/gatekeeper.yml@feature/auto-cherry-pick-gatekeeper
+    secrets:
+      CROSS_REPO_TOKEN: ${{ secrets.CROSS_REPO_TOKEN }}
