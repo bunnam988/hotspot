@@ -260,6 +260,9 @@ static void* log_flood_thread(void* arg) {
             mode = 22; // Removal: flood 'Removal case, Client with' marker string
         } else if (access("/tmp/log_add_remove_pattern", F_OK) == 0) {
             mode = 23; // Pattern: flood add+remove as 2-msg pattern for pattern suppression
+        } else if (access("/tmp/log_telemetry_marker", F_OK) == 0) {
+            mode = 24; // Telemetry marker test: flood a string that has an active T1 COUNTER
+                       // marker in Hotspotlog.txt.0 profile (SYS_ERROR_HotSpotInitFail)
         }
         if (mode != 0) {
             CcspTraceInfo(("[DEBUG] Entered log flooding logic, mode=%d\n", mode));
@@ -463,6 +466,20 @@ static void* log_flood_thread(void* arg) {
                 usleep(5000); // 5ms gap between cycles (~100 pairs/s)
             }
             CcspTraceInfo(("[ADD_REMOVE PATTERN FLOOD] Done\n"));
+        } else if (mode == 24) {
+            // Telemetry marker flood: emit a string that matches an existing T1 grep
+            // COUNTER marker in the active profile:
+            //   header: SYS_ERROR_HotSpotInitFail
+            //   content: "Error while getting startup parameters"
+            //   type: Hotspotlog.txt.0
+            // Fixed string so suppression fires. Telemetry should count N from the
+            // suppression summary line instead of just 1.
+            time_t start = time(NULL);
+            while (difftime(time(NULL), start) < 5.0) {
+                CcspTraceInfo(("Error while getting startup parameters\n"));
+                usleep(10000); // 10ms between logs (~100 msg/s)
+            }
+            CcspTraceInfo(("[TELEMETRY MARKER FLOOD] Done\n"));
         }
         sleep(30);
     }
